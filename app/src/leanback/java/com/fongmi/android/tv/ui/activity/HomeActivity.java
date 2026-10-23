@@ -88,7 +88,7 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
     public static boolean isRunning() {
         return instanceCount > 0;
     }
-
+    private boolean mBootLiveDone = false;
     private ActivityHomeBinding mBinding;
     private ArrayObjectAdapter mHistoryAdapter;
     private ArrayObjectAdapter mFuncAdapter;
@@ -240,7 +240,10 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
             public void success() {
                 onConfigReady();
             }
-
+        if (!mBootLiveDone && Setting.isBootLive() && !LiveConfig.get().isEmpty()) {
+            mBootLiveDone = true;
+            LiveActivity.start(getActivity());
+            }
             @Override
             public void error(String msg) {
                 Notify.show(msg);
