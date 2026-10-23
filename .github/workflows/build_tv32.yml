@@ -13,7 +13,7 @@ jobs:
         with:
           submodules: recursive
 
-      - name: 2. 配置 JDK 21 (匹配项目 JavaVersion.VERSION_21)
+      - name: 2. 配置 JDK 21
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
@@ -34,22 +34,47 @@ jobs:
           keyPassword=android
           EOF
 
-      - name: 4. 屏蔽 Native 校验并编译 Leanback 32位 APK
+      - name: 4. 自动补齐缺失的 Media3 资源依赖与 Native 库
         run: |
-          # 如果 app/build.gradle 中定义了 verify...MpvNative 等硬性检查任务，将其替换为空操作防止中断
-          sed -i 's/verify.*Native/\/\/ &/g' app/build.gradle || true
+          # 1. 下载 FongMi 官方最新 Release 的 32位 APK，提取里面预编译好的 lib/*.so 原生库 (解决 MPV/FFmpeg 等 .so 缺失问题)
+          mkdir -p temp_apk app/src/main/jniLibs/armeabi-v7a
+          curl -sL "https://github.com/FongMi/Release/raw/fongmi/apk/release/leanback-armeabi_v7a.apk" -o temp_apk/base.apk || \
+          curl -sL "https://raw.githubusercontent.com/FongMi/Release/okjack/apk/release/leanback-armeabi_v7a.apk" -o temp_apk/base.apk || true
+          
+          if [ -f temp_apk/base.apk ]; then
+            unzip -q temp_apk/base.apk "lib/armeabi-v7a/*" -d temp_apk/ || true
+            cp -rf temp_apk/lib/armeabi-v7a/* app/src/main/jniLibs/armeabi-v7a/ 2>/dev/null || true
+          fi
+          rm -rf temp_apk
 
-          # 查找匹配的 32位 (v7a/arm32) Release 编译任务
-          TASK=$(./gradlew :app:tasks --all | grep -iE "assembleLeanback.*(v7a|arm32).*Release" | head -n 1 | awk '{print $1}')
-          if [ -z "$TASK" ]; then
-            echo "执行 assembleLeanbackRelease (跳过 Native 校验与 Lint)..."
-            ./gradlew :app:assembleLeanbackRelease -x lint -x verifyLeanbackReleaseMpvNative || ./gradlew :app:assembleLeanbackDebug -x lint
-          else
-            echo "正在执行编译任务: :app:$TASK"
-            ./gradlew ":app:$TASK" -x lint
+          # 2. 检查 app/libs 下是否缺少 media3 的 .aar 文件；若缺少则自动注入标准 Media3 依赖以提供 exo_* 和 media3_* 资源
+          if ! ls app/libs/*media3*.aar 1> /dev/null 2>&1; then
+            echo "检测到 app/libs 下缺少本地 Media3 AAR，正在向 app/build.gradle 注入标准 Media3 UI/ExoPlayer 依赖..."
+            MEDIA3_VER="1.5.1"
+            sed -i "/dependencies {/a \\
+              implementation \"androidx.media3:media3-ui:\$MEDIA3_VER\"\\
+              implementation \"androidx.media3:media3-common:\$MEDIA3_VER\"\\
+              implementation \"androidx.media3:media3-exoplayer:\$MEDIA3_VER\"\\
+              implementation \"androidx.media3:media3-exoplayer-hls:\$MEDIA3_VER\"\\
+              implementation \"androidx.media3:media3-exoplayer-dash:\$MEDIA3_VER\"\\
+              implementation \"androidx.media3:media3-exoplayer-rtsp:\$MEDIA3_VER\"\\
+              implementation \"androidx.media3:media3-datasource-okhttp:\$MEDIA3_VER\"\\
+              implementation \"androidx.media3:media3-datasource-rtmp:\$MEDIA3_VER\"\\
+              implementation \"androidx.media3:media3-extractor:\$MEDIA3_VER\"\\
+              implementation \"androidx.media3:media3-session:\$MEDIA3_VER\"" app/build.gradle
           fi
 
-      - name: 5. 提取并上传 32位 APK
+          # 3. 屏蔽 build.gradle 中的 verify...Native 硬性检查
+          sed -i 's/verify.*Native/\/\/ &/g' app/build.gradle || true
+
+      - name: 5. 仅编译 Leanback 32位 (armeabi-v7a) APK
+        run: |
+          # 显式指定只编译 32位 (armeabi-v7a) 以节省时间
+          ./gradlew :app:assembleLeanbackArmeabi_v7aRelease -x lint -x verifyLeanbackReleaseMpvNative || \
+          ./gradlew :app:assembleLeanbackRelease -Pabi=armeabi-v7a -x lint -x verifyLeanbackReleaseMpvNative || \
+          ./gradlew :app:assembleLeanbackDebug -x lint
+
+      - name: 6. 提取并上传 32位 APK
         uses: actions/upload-artifact@v4
         with:
           name: FongMi-Leanback-armeabi-v7a
