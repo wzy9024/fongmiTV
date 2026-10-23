@@ -136,4 +136,10 @@ public class Setting {
     public static void putZhuyin(boolean zhuyin) {
         Prefers.put("zhuyin", zhuyin);
     }
+    public static boolean isBootLive() {
+        return Prefers.getBoolean("boot_live");
+    }
+    public static void putBootLive(boolean val) {
+        Prefers.put("boot_live", val);
+    }
 }
