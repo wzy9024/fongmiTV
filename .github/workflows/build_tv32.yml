@@ -20,8 +20,18 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: 3. 赋予 gradlew 执行权限
-        run: chmod +x gradlew
+      - name: 3. 自动生成 local.properties 并赋予执行权限
+        run: |
+          chmod +x gradlew
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          # 补充可能被 build.gradle 读取的签名属性防止空指针报错
+          echo "KEY_PATH=debug.keystore" >> local.properties
+          echo "KEY_ALIAS=androiddebugkey" >> local.properties
+          echo "STORE_PASS=android" >> local.properties
+          echo "KEY_PASS=android" >> local.properties
+          # 自动生成一个通用签名文件放在根目录和 app 目录下备用
+          keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          cp debug.keystore app/debug.keystore
 
       - name: 4. 仅编译 Leanback 32位 (armeabi-v7a) Debug 版
         run: |
