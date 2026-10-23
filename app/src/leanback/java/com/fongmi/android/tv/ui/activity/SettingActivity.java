@@ -72,6 +72,7 @@ public class SettingActivity extends BaseActivity implements ConfigListener, Sit
 
     @Override
     protected void initView(Bundle savedInstanceState) {
+        mBinding.bootLiveText.setText(getSwitch(Setting.isBootLive()));
         mBinding.vod.requestFocus();
         mBinding.vodUrl.setText(VodConfig.getDesc());
         mBinding.liveUrl.setText(LiveConfig.getDesc());
@@ -98,6 +99,7 @@ public class SettingActivity extends BaseActivity implements ConfigListener, Sit
 
     @Override
     protected void initEvent() {
+        mBinding.bootLive.setOnClickListener(this::onBootLive);
         mBinding.vod.setOnClickListener(this::onVod);
         mBinding.doh.setOnClickListener(this::setDoh);
         mBinding.live.setOnClickListener(this::onLive);
@@ -261,7 +263,10 @@ public class SettingActivity extends BaseActivity implements ConfigListener, Sit
     private void setDoh(View view) {
         DohDialog.create().index(getDohIndex()).show(this);
     }
-
+    private void onBootLive(View view) {
+        Setting.putBootLive(!Setting.isBootLive());
+        mBinding.bootLiveText.setText(getSwitch(Setting.isBootLive()));
+    }
     @Override
     public void setDoh(Doh doh) {
         OkHttp.dns().setDoh(doh);
