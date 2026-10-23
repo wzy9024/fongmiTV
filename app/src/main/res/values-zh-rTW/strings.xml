@@ -591,5 +591,5 @@
     <string name="auto_current_episode">目前播放集</string>
     <string name="auto_add_favorite">加入收藏</string>
     <string name="auto_remove_favorite">取消收藏</string>
-
+    <string name="setting_boot_live">启动进入直播</string>
 </resources>
