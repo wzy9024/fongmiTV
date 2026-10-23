@@ -1,0 +1,49 @@
+name: Build Leanback 32-bit APK
+
+on:
+  workflow_dispatch: # 支持在 Actions 页面手动点击运行
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. 检出代码及子模块
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: 2. 配置 JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: 3. 配置 Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 4. 赋予 gradlew 执行权限
+        run: chmod +x gradlew
+
+      - name: 5. 仅编译 Leanback 32位 (armeabi-v7a) Debug 版
+        # 自动匹配项目中名称包含 leanback 且包含 v7a/arm32 的 Debug 编译任务
+        run: |
+          TASK=$(./gradlew :app:tasks --all | grep -iE "assembleLeanback.*(v7a|arm32).*Debug" | head -n 1 | awk '{print $1}')
+          if [ -z "$TASK" ]; then
+            echo "未匹配到单独的v7a任务名，回退至编译 Leanback Debug..."
+            ./gradlew :app:assembleLeanbackDebug
+          else
+            echo "正在执行编译任务: :app:$TASK"
+            ./gradlew ":app:$TASK"
+          fi
+
+      - name: 6. 提取并上传 32位 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: FongMi-Leanback-armeabi-v7a
+          path: |
+            app/build/outputs/apk/**/*v7a*.apk
+            app/build/outputs/apk/**/*arm32*.apk
+            app/build/outputs/apk/leanback/**/*.apk
+          if-no-files-found: error
